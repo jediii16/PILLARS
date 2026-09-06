@@ -1,5 +1,6 @@
 local Players = game:GetService("Players")
 
+local CoverService = require(script.Parent.Parent.Cover.CoverService)
 local PlayerSpawnService = require(script.Parent.Parent.Players.PlayerSpawnService)
 local RoundConfig = require(script.Parent.RoundConfig)
 local RoundController = require(script.Parent.RoundController)
@@ -12,6 +13,7 @@ local controller = RoundController.new({
 	Wait = task.wait,
 	Random = Random.new(),
 	PlayerSpawnService = PlayerSpawnService,
+	CoverService = CoverService,
 })
 
 local started = false

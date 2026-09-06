@@ -26,6 +26,7 @@ function RoundController.new(dependencies)
 	assert(dependencies.Wait, "RoundController Wait is required")
 	assert(dependencies.Random, "RoundController Random is required")
 	assert(dependencies.PlayerSpawnService, "RoundController PlayerSpawnService is required")
+	assert(dependencies.CoverService, "RoundController CoverService is required")
 
 	local self = setmetatable({}, RoundController)
 	self._config = dependencies.Config
@@ -33,6 +34,7 @@ function RoundController.new(dependencies)
 	self._wait = dependencies.Wait
 	self._random = dependencies.Random
 	self._playerSpawnService = dependencies.PlayerSpawnService
+	self._coverService = dependencies.CoverService
 	self._connectHumanoidDied = dependencies.ConnectHumanoidDied or function(humanoid, callback)
 		return humanoid.Died:Connect(callback)
 	end
@@ -197,6 +199,7 @@ function RoundController:_cleanupRound(generation: number)
 	end
 
 	self._playerSpawnService.ClearAssignments()
+	self._coverService.ClearRoundCover()
 	self:_clearRoundTables()
 	self:_log("PILLARS round cleanup complete")
 end
@@ -212,6 +215,27 @@ function RoundController:_beginStarting(sessionToken)
 	self:_disconnectDeathListeners()
 	self:_clearRoundTables()
 	self._playerSpawnService.ClearAssignments()
+	self._coverService.ClearRoundCover()
+
+	local coverCallSucceeded, coverOrError, generationError = pcall(self._coverService.GenerateRoundCover)
+	local cover = if coverCallSucceeded then coverOrError else nil
+	local coverError = if coverCallSucceeded then generationError else coverOrError
+
+	if not cover then
+		self:_log("PILLARS round setup aborted: cover generation failed: " .. tostring(coverError))
+		self:_cleanupRound(generation)
+
+		if self._state == RoundState.STARTING and self:_isSessionCurrent(sessionToken) then
+			self:_transition(RoundState.WAITING)
+		end
+
+		return
+	end
+
+	if not self:_isSessionCurrent(sessionToken) then
+		self:_cleanupRound(generation)
+		return
+	end
 
 	local eligible = self:_connectedEligiblePlayers()
 	local selected = {}

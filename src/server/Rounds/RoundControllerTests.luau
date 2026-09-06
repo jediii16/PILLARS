@@ -99,6 +99,31 @@ local function newHarness(initialPlayers, options)
 	local random = (options and options.Random) or newRandom(nil)
 	local config = newConfig(options and options.Config)
 	local harness = {}
+	local coverState = {
+		ClearCount = 0,
+		Exists = false,
+		GenerateCount = 0,
+	}
+	local coverService = {}
+
+	function coverService.ClearRoundCover(): boolean
+		coverState.ClearCount += 1
+		local existed = coverState.Exists
+		coverState.Exists = false
+		return existed
+	end
+
+	function coverService.GenerateRoundCover()
+		coverState.GenerateCount += 1
+
+		if options and options.CoverGenerationFails then
+			coverState.Exists = false
+			return nil, "intentional cover generation failure"
+		end
+
+		coverState.Exists = true
+		return { Name = "TestRoundCover" }, nil
+	end
 
 	function harness.GetEligiblePlayers()
 		return table.clone(eligiblePlayers)
@@ -116,6 +141,7 @@ local function newHarness(initialPlayers, options)
 
 	harness.Players = eligiblePlayers
 	harness.Random = random
+	harness.Cover = coverState
 	harness.ConnectHumanoidDied = function(humanoid, callback)
 		deathCallbacks[humanoid] = callback
 		local connected = true
@@ -147,6 +173,7 @@ local function newHarness(initialPlayers, options)
 		Wait = harness.Wait,
 		Random = random,
 		PlayerSpawnService = PlayerSpawnService,
+		CoverService = coverService,
 		ConnectHumanoidDied = harness.ConnectHumanoidDied,
 	})
 
@@ -195,6 +222,35 @@ end
 function RoundControllerTests.Run()
 	ArenaService.Generate()
 	PlayerSpawnService.ClearAssignments()
+
+	do
+		local harness
+		local first = newPlayer("CoverOrderA", {
+			BeforeLoad = function()
+				assert(harness.Cover.Exists, "cover must exist before the first participant character loads")
+			end,
+		})
+		local second = newPlayer("CoverOrderB")
+		harness = newHarness({ first, second })
+		advanceThroughSetup(harness.Controller)
+		assert(harness.Controller:GetState() == RoundState.ACTIVE, "cover-aware setup must still become active")
+		assert(harness.Cover.GenerateCount == 1, "successful STARTING must generate cover exactly once")
+		assert(harness.Cover.Exists, "cover must remain throughout ACTIVE")
+		resetScenario(harness.Controller)
+	end
+
+	do
+		local first = newPlayer("CoverFailureA")
+		local second = newPlayer("CoverFailureB")
+		local harness = newHarness({ first, second }, { CoverGenerationFails = true })
+		advanceThroughSetup(harness.Controller)
+		assert(harness.Controller:GetState() == RoundState.WAITING, "cover generation failure must abort setup")
+		assert(harness.Cover.GenerateCount == 1, "failed cover generation must be attempted exactly once")
+		assert(not harness.Cover.Exists, "failed cover generation must leave no cover")
+		assert(first.LoadCount == 0 and second.LoadCount == 0, "cover failure must abort before participant spawning")
+		assert(PlayerSpawnService.GetPillarIndex(first) == nil, "cover failure must not assign participants")
+		resetScenario(harness.Controller)
+	end
 
 	do
 		local lonePlayer = newPlayer("LonePlayer")
@@ -305,6 +361,7 @@ function RoundControllerTests.Run()
 		assert(not harness.Controller:IsParticipant(first), "aborted setup must clear participant state")
 		assert(first.Character.Parent == nil, "aborted setup must destroy partial characters")
 		assert(PlayerSpawnService.GetPillarIndex(first) == nil, "aborted setup must clear assignments")
+		assert(harness.Cover.GenerateCount == 1 and not harness.Cover.Exists, "aborted setup must clear generated cover")
 		resetScenario(harness.Controller)
 	end
 
@@ -432,12 +489,14 @@ function RoundControllerTests.Run()
 		waitUntil(function()
 			return harness.Controller:GetState() == RoundState.ENDING
 		end, "cleanup test round must end")
+		assert(harness.Cover.Exists, "cover must remain throughout the ENDING delay until cleanup")
 		local firstRoundCharacter = second.Character
 		harness.Controller:Advance()
 		assert(harness.Controller:GetState() == RoundState.WAITING, "ending must clean and return to waiting")
 		assert(firstRoundCharacter.Parent == nil, "ending cleanup must destroy surviving character")
 		assert(PlayerSpawnService.GetPillarIndex(second) == nil, "ending cleanup must clear assignments")
 		assert(harness.Controller:GetAliveCount() == 0 and harness.Controller:GetWinner() == nil, "ending cleanup must clear round state")
+		assert(not harness.Cover.Exists, "normal ending cleanup must remove round cover")
 
 		first.Parent = Players
 		second.Parent = Players
@@ -445,6 +504,16 @@ function RoundControllerTests.Run()
 		assert(harness.Controller:GetState() == RoundState.ACTIVE, "second round must start without restarting")
 		assert(random:GetCallCount() == 2, "each two-player round must shuffle independently")
 		assert(PlayerSpawnService.GetPillarIndex(first) ~= firstRoundPillar, "scripted second shuffle must affect new assignments")
+		assert(harness.Cover.GenerateCount == 2 and harness.Cover.Exists, "second round must generate fresh cover")
+
+		harness.Kill(first)
+		waitUntil(function()
+			return harness.Controller:GetState() == RoundState.ENDING
+		end, "second cleanup test round must end")
+		harness.Controller:Advance()
+		advanceThroughSetup(harness.Controller)
+		assert(harness.Controller:GetState() == RoundState.ACTIVE, "third round must start without stale state")
+		assert(harness.Cover.GenerateCount == 3 and harness.Cover.Exists, "third round must generate fresh cover")
 		resetScenario(harness.Controller)
 	end
 
