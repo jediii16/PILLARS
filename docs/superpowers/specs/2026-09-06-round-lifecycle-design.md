@@ -266,6 +266,7 @@ Tests are split by responsibility and run through a dedicated Prompt 003 Studio 
 - Process an `ACTIVE` Humanoid death exactly once and never respawn that player during the round.
 - Treat death-plus-disconnect as one elimination.
 - Remove an active disconnect from alive tracking, release its assignment, and evaluate the result.
+- With exactly two players alive during `ACTIVE`, disconnect one player and verify that the disconnect is processed once, releases that player's assignment, records the sole remaining player as winner, and immediately transitions to `ENDING`.
 - Record the sole survivor as winner.
 - End safely with no winner when zero survive.
 - Ignore stale death callbacks after cleanup or generation change.
