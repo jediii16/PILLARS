@@ -82,12 +82,12 @@ An unmanaged template `SpawnLocation` is not used by this system. Because automa
 
 Server startup proceeds in this order:
 
-1. Disable automatic character loading.
-2. Run Studio-only Prompt 001 tests.
-3. Generate the arena.
-4. Run Studio-only focused assignment tests with isolated fake participant keys and clear the test state.
-5. Start `DevelopmentSpawnBootstrap`.
-6. Process any players who joined during server initialization, then handle later `PlayerAdded` events.
+1. Run Studio-only Prompt 001 tests.
+2. Generate the arena.
+3. Start `DevelopmentSpawnBootstrap`, which immediately disables automatic character loading before processing players.
+4. Process any players who joined during server initialization, then handle later `PlayerAdded` events.
+
+Prompt 002 fake-player tests run through a separate Studio RunScript harness rather than during multiplayer Play sessions, so test-owned assignment mutations cannot interfere with real local clients.
 
 For each prototype participant, the bootstrap calls `AssignPlayer`; on success it calls `SpawnPlayer`. Failures are warned on the server. On `PlayerRemoving`, it calls `ReleasePlayer`. It never automatically retries an unassigned waiting player.
 
@@ -114,6 +114,14 @@ Focused service tests use opaque server-side participant objects for assignment 
 Spawn-focused tests use the real generated arena plus controlled fake player objects whose asynchronous loader returns real character Models. They validate marker-based positioning, missing assignments, no generated `SpawnLocation`, concurrent-call rejection, and cancellation when the player leaves or an assignment is released during a yield.
 
 Runtime Studio verification validates the real `Players` lifecycle: unique multiplayer placement, assignment release after a client leaves, no ninth-player character, and no automatic respawn after Humanoid death. Prompt 001 arena suites and the Rojo build run unchanged as regressions.
+
+During Studio multiplayer tests, `DevelopmentSpawnBootstrap` emits one read-only diagnostic line after each assignment from the same gameplay server context that owns the service state. Each line verifies both query directions, for example:
+
+```text
+PILLARS Studio assignment: Player1 -> Pillar 1 | Pillar 1 -> Player1
+```
+
+Use these lines in the server Output to verify authoritative assignments. Do not require `PlayerSpawnService` from Studio's Server Command Bar for this check: the Command Bar runs in a separate execution context and receives a separate runtime copy of module-local tables. The diagnostic stores no snapshot or mirrored assignment state; it reads the service's existing maps at log time and is loaded only when `RunService:IsStudio()` is true.
 
 ## Assumptions
 

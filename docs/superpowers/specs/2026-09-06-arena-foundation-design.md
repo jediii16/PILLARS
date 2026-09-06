@@ -21,11 +21,11 @@ The existing server entry point initializes the arena once when the server start
 - `PILLAR_RADIUS = 80`
 - `PILLAR_HEIGHT = 70`
 - `CENTER_PLATFORM_SIZE = Vector3.new(24, 4, 24)`
-- `VOID_KILL_HEIGHT = 0`
+- `VOID_KILL_HEIGHT = -150`
 
-It also owns focused supporting values such as arena center, spawn-marker offset and size, generated model name, and neutral prototype colors. Geometry modules consume these values rather than duplicating numeric literals.
+It also owns focused supporting values such as arena center, spawn-marker offset and size, generated model name, and neutral prototype colors. `VOID_BOUNDARY_MARGIN = 1024` keeps the invisible kill boundary substantially larger than the playable footprint. Geometry modules consume these values rather than duplicating numeric literals.
 
-With platform tops at approximately 70 studs and the kill boundary at 0 studs, a falling player has a short recovery window. An 80-stud pillar-center radius leaves approximately 60 studs between the nearest edges of a 16-stud-deep pillar and a 24-stud-deep center platform, well beyond an ordinary Roblox jump.
+With platform tops at approximately 70 studs and the kill boundary at -150 studs, a falling player has 220 studs of vertical recovery distance for future mobility items. An 80-stud pillar-center radius leaves approximately 60 studs between the nearest edges of a 16-stud-deep pillar and a 24-stud-deep center platform, well beyond an ordinary Roblox jump.
 
 ### ArenaLayout
 
@@ -49,7 +49,7 @@ The spawn marker for each pillar is centered horizontally above the platform. It
 2. Create a new arena model in `Workspace`.
 3. Create a permanent-geometry folder containing eight anchored starting pillar Parts and one anchored center platform Part.
 4. Create a spawn-markers folder containing one invisible, anchored, non-collidable marker Part per pillar.
-5. Create an invisible, anchored, non-collidable void boundary Part at the configured kill height.
+5. Create one logical void boundary at the configured kill height, tiled from engine-safe invisible, anchored, non-collidable Parts when its configured coverage exceeds Roblox's per-Part size limit.
 6. Connect the void boundary touch handler so a character Humanoid crossing it is reduced to zero health.
 7. Parent the completed model to `Workspace` and return it.
 
@@ -61,7 +61,7 @@ Permanent geometry is structurally separated from spawn metadata. This leaves cl
 
 All visible arena geometry uses basic anchored Roblox Parts with a neutral material and restrained colors. Permanent parts are locked, have `CanCollide` enabled, and carry a `PermanentGeometry` attribute. Spawn markers are fully transparent, anchored, non-collidable, non-queryable, and non-touchable.
 
-The void boundary is a broad invisible Part below the arena. It does not catch falling characters physically. Its only behavior is detecting character contact and killing the character's Humanoid. Its horizontal dimensions are derived from the pillar radius and platform sizes so it covers the complete playable footprint with margin.
+The void boundary is one broad logical boundary below the arena. It does not catch falling characters physically. Its only behavior is detecting character contact and killing the character's Humanoid. Its horizontal dimensions are derived from the pillar radius and platform sizes plus the generous configured margin. With the prototype values, it covers approximately `2224 × 2 × 2224` studs using four seamless `1112 × 2 × 1112` trigger Parts so Roblox does not clamp the requested coverage to its per-Part size ceiling.
 
 ## Validation and Error Handling
 

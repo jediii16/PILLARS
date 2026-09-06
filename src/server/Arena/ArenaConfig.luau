@@ -1,0 +1,28 @@
+local ArenaConfig = {
+	PLAYER_COUNT = 8,
+
+	PILLAR_SIZE = Vector3.new(16, 4, 16),
+	PILLAR_RADIUS = 80,
+	PILLAR_HEIGHT = 70,
+
+	CENTER_PLATFORM_SIZE = Vector3.new(24, 4, 24),
+	VOID_KILL_HEIGHT = -150,
+
+	ARENA_CENTER = Vector3.new(0, 0, 0),
+	SPAWN_MARKER_SIZE = Vector3.new(4, 1, 4),
+	SPAWN_MARKER_OFFSET = 3,
+
+	VOID_BOUNDARY_THICKNESS = 2,
+	VOID_BOUNDARY_MARGIN = 1024,
+	VOID_BOUNDARY_MAX_TILE_SIZE = 2048,
+
+	GENERATED_MODEL_NAME = "GeneratedArena",
+	PERMANENT_GEOMETRY_FOLDER_NAME = "PermanentGeometry",
+	SPAWN_MARKERS_FOLDER_NAME = "SpawnMarkers",
+
+	PILLAR_COLOR = Color3.fromRGB(105, 110, 120),
+	CENTER_PLATFORM_COLOR = Color3.fromRGB(125, 130, 140),
+	PLATFORM_MATERIAL = Enum.Material.Concrete,
+}
+
+return table.freeze(ArenaConfig)
